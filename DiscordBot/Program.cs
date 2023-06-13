@@ -5,6 +5,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using DiscordBot.Modules;
 
 namespace DiscordBot
 {
@@ -23,9 +24,9 @@ namespace DiscordBot
                 GatewayIntents = GatewayIntents.DirectMessages
                                  | GatewayIntents.GuildMessages
                                  | GatewayIntents.Guilds
-                                 | GatewayIntents.GuildMembers
                                  | GatewayIntents.MessageContent
                                  | GatewayIntents.GuildVoiceStates
+                                 | GatewayIntents.GuildWebhooks
             };
 
             _client = new DiscordSocketClient(config);
@@ -35,9 +36,10 @@ namespace DiscordBot
             _services = new ServiceCollection()
                 .AddSingleton(_client)
                 .AddSingleton(_commands)
+                .AddSingleton<AudioService>()
                 .BuildServiceProvider();
 
-            string token = "token bot";
+            string token = "your token bot here";
 
             _client.Log += Client_Log;
 

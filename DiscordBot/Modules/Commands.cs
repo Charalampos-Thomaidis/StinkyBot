@@ -10,12 +10,19 @@ namespace DiscordBot.Modules
 {
     public class Commands : ModuleBase<SocketCommandContext>
     {
+        private readonly AudioService _audioService;
+
+        public Commands(AudioService audioService)
+        {
+            _audioService = audioService;
+        }
+
         [Command("song", RunMode = RunMode.Async)]
         public async Task HandlePlayCommand([Remainder] string arguments)
         {
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
 
-            await ReplyAsync("Searching for song give me few seconds.");
+            await ReplyAsync("Searching for song, please wait...");
 
             if (voiceChannel == null)
             {
@@ -29,22 +36,6 @@ namespace DiscordBot.Modules
 
             var video = searchResults.FirstOrDefault();
 
-            if (video == null)
-            {
-                await ReplyAsync("No search results found.");
-                return;
-            }
-            
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(video.Id);
-
-            var audioStreamInfo = streamManifest.GetAudioOnlyStreams().FirstOrDefault();
-
-            if (audioStreamInfo == null)
-            {
-                await ReplyAsync("Failed to retrieve audio stream for the video.");
-                return;
-            }
-
             var streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(video.Id);
 
             var audioStreamInfoWithHighestBitrate = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
@@ -54,14 +45,24 @@ namespace DiscordBot.Modules
                 await ReplyAsync("Failed to retrieve audio stream for the video.");
                 return;
             }
-            
+
             var filePath = $"{video.Id}.{audioStreamInfoWithHighestBitrate.Container.Name}";
 
             await youtube.Videos.Streams.DownloadAsync(audioStreamInfoWithHighestBitrate, filePath);
 
             var response = $"Now playing: {video.Title}\n{video.Url}";
 
-            await Context.Channel.SendMessageAsync(response);
+            await ReplyAsync(response);
+
+            await _audioService.PlayAudio(voiceChannel, filePath);
+        }
+
+        [Command("skip", RunMode = RunMode.Async)]
+        public async Task SkipCommand()
+        {
+            await _audioService.StopAudio();
+
+            await ReplyAsync("Skipped the current song.");
         }
 
         [Command("summon", RunMode = RunMode.Async)]
@@ -99,7 +100,7 @@ namespace DiscordBot.Modules
         [Command("commands")]
         public async Task HandleExplanationCommands()
         {
-            await ReplyAsync("!song (name song)\n !summon (ill join your vc)\n !leave (ill leave your vc)");
+            await ReplyAsync("!song + name of the song (play song)\n!summon (ill join your vc)\n!leave (ill leave your vc)\n!skip (skip song)");
         }
     }
 }
