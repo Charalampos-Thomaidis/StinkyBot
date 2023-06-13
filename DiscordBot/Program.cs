@@ -26,7 +26,6 @@ namespace DiscordBot
                                  | GatewayIntents.Guilds
                                  | GatewayIntents.MessageContent
                                  | GatewayIntents.GuildVoiceStates
-                                 | GatewayIntents.GuildWebhooks
             };
 
             _client = new DiscordSocketClient(config);
