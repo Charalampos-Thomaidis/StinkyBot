@@ -38,7 +38,7 @@ namespace DiscordBot
                 .AddSingleton<AudioService>()
                 .BuildServiceProvider();
 
-            string token = "your token bot here";
+            string token = "token bot here";
 
             _client.Log += Client_Log;
 

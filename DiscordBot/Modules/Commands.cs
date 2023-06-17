@@ -5,6 +5,7 @@ using Discord.Commands;
 using YoutubeExplode;
 using YoutubeExplode.Common;
 using YoutubeExplode.Videos.Streams;
+using Discord.WebSocket;
 
 namespace DiscordBot.Modules
 {
@@ -20,15 +21,15 @@ namespace DiscordBot.Modules
         [Command("song", RunMode = RunMode.Async)]
         public async Task HandlePlayCommand([Remainder] string arguments)
         {
-            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+            var botVoiceState = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceState;
 
-            await ReplyAsync("Searching for song, please wait...");
-
-            if (voiceChannel == null)
+            if (botVoiceState?.VoiceChannel == null)
             {
-                await ReplyAsync("You must be in a voice channel to use this command.");
+                await ReplyAsync("I am not currently in a voice channel.");
                 return;
             }
+
+            await ReplyAsync("Searching for song, please wait...");
 
             var youtube = new YoutubeClient();
 
@@ -40,12 +41,6 @@ namespace DiscordBot.Modules
 
             var audioStreamInfoWithHighestBitrate = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
 
-            if (audioStreamInfoWithHighestBitrate == null)
-            {
-                await ReplyAsync("Failed to retrieve audio stream for the video.");
-                return;
-            }
-
             var filePath = $"{video.Id}.{audioStreamInfoWithHighestBitrate.Container.Name}";
 
             await youtube.Videos.Streams.DownloadAsync(audioStreamInfoWithHighestBitrate, filePath);
@@ -54,21 +49,27 @@ namespace DiscordBot.Modules
 
             await ReplyAsync(response);
 
-            await _audioService.PlayAudio(voiceChannel, filePath);
+            await _audioService.SendAudio(Context.Client.GetGuild(Context.Guild.Id).AudioClient, filePath);
         }
 
         [Command("skip", RunMode = RunMode.Async)]
-        public async Task SkipCommand()
+        public async Task HandleSkipCommand()
         {
-            await _audioService.StopAudio();
+            if (!_audioService.IsPlaying)
+            {
+                await ReplyAsync("There is no song currently playing.");
+                return;
+            }
+
+            _audioService.StopAudio();
 
             await ReplyAsync("Skipped the current song.");
         }
 
         [Command("summon", RunMode = RunMode.Async)]
-        public async Task HandleSummonBotCommand(IVoiceChannel voiceChannel = null)
+        public async Task HandleSummonBotCommand()
         {
-            voiceChannel ??= (Context.User as IGuildUser)?.VoiceChannel;
+            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
 
             if (voiceChannel == null)
             {
@@ -76,25 +77,27 @@ namespace DiscordBot.Modules
                 return;
             }
 
-            await ReplyAsync("Joined the voice channel.");
-
             await voiceChannel.ConnectAsync();
+
+            await ReplyAsync("Joined the voice channel.");
         }
 
         [Command("leave", RunMode = RunMode.Async)]
-        public async Task HandleLeaveBotCommand(IVoiceChannel voiceChannel = null)
+        public async Task LeaveCommand()
         {
-            voiceChannel ??= (Context.User as IGuildUser)?.VoiceChannel;
+            var guild = (Context.Client as DiscordSocketClient).GetGuild(Context.Guild.Id);
 
-            if (voiceChannel == null)
+            var audioClient = guild?.AudioClient;
+
+            if (audioClient?.ConnectionState == ConnectionState.Disconnected)
             {
-                await ReplyAsync("The bot is not currently in a voice channel.");
+                await ReplyAsync("I am not currently in a voice channel.");
                 return;
             }
 
-            await ReplyAsync("Left the voice channel.");
+            await audioClient.StopAsync();
 
-            await voiceChannel.DisconnectAsync();
+            await ReplyAsync("Left the voice channel.");
         }
 
         [Command("commands")]

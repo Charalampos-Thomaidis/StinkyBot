@@ -1,34 +1,46 @@
-﻿using System.Threading.Tasks;
-using Discord;
-using NAudio.Wave;
+﻿using System.Diagnostics;
+using System.Threading.Tasks;
+using Discord.Audio;
 
 namespace DiscordBot.Modules
 {
     public class AudioService
     {
-        private WaveOutEvent _waveOut;
+        private Process ffmpeg;
 
-        public async Task PlayAudio(IVoiceChannel voiceChannel, string filePath)
+        public bool IsPlaying { get; internal set; }
+
+        private Process CreateStream(string path)
         {
-            using (var audioFile = new AudioFileReader(filePath))
-            using (var volumeAdjusted = new WaveChannel32(audioFile) { Volume = 0.2f })
+            return Process.Start(new ProcessStartInfo
             {
-                _waveOut = new WaveOutEvent();
-                _waveOut.Init(volumeAdjusted);
-                _waveOut.Play();
-                await Task.Delay(-1);
+                FileName = "ffmpeg",
+                Arguments = $"-i {path} -f s16le -ar 48000 -ac 2 pipe:1",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+            }); 
+        }
+        
+        public async Task SendAudio(IAudioClient audioClient, string path)
+        {
+            IsPlaying = true;
+
+            using (ffmpeg = CreateStream(path))
+            using (var output = ffmpeg.StandardOutput.BaseStream)
+            using (var discord = audioClient.CreatePCMStream(AudioApplication.Mixed))
+            {
+                try { await output.CopyToAsync(discord); }
+                finally { await discord.FlushAsync(); }
             }
+
+            IsPlaying = false;
         }
 
-        public async Task StopAudio()
+        public void StopAudio()
         {
-            if (_waveOut != null)
-            {
-                _waveOut.Stop();
-                _waveOut.Dispose();
-                _waveOut = null;
-            }
-            await Task.CompletedTask;
+            IsPlaying = false;
+            ffmpeg.Kill();
+            ffmpeg.Dispose();
         }
     }
 }

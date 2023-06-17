@@ -14,8 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="Discord.Net" Version="3.10.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-    <PackageReference Include="NAudio" Version="1.10.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
     <PackageReference Include="YoutubeExplode" Version="6.2.15" />
   </ItemGroup>
 
