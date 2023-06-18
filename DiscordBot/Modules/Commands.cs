@@ -71,9 +71,17 @@ namespace DiscordBot.Modules
         {
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
 
+            var bvoiceChannel = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceChannel;
+
             if (voiceChannel == null)
             {
                 await ReplyAsync("You must be in a voice channel to use this command.");
+                return;
+            }
+
+            if (bvoiceChannel == voiceChannel)
+            {
+                await ReplyAsync("I am currently in your voice channel.");
                 return;
             }
 
