@@ -1,11 +1,14 @@
 ﻿using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Linq;
 using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
+using Discord.Audio;
 using YoutubeExplode;
+using YoutubeExplode.Search;
 using YoutubeExplode.Common;
 using YoutubeExplode.Videos.Streams;
-using Discord.WebSocket;
 
 namespace DiscordBot.Modules
 {
@@ -21,7 +24,7 @@ namespace DiscordBot.Modules
         [Command("song", RunMode = RunMode.Async)]
         public async Task HandlePlayCommand([Remainder] string arguments)
         {
-            var botVoiceState = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceState;
+            SocketVoiceState? botVoiceState = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceState;
 
             if (botVoiceState?.VoiceChannel == null)
             {
@@ -33,19 +36,19 @@ namespace DiscordBot.Modules
 
             var youtube = new YoutubeClient();
 
-            var searchResults = await youtube.Search.GetVideosAsync(arguments);
+            IReadOnlyList<VideoSearchResult> searchResults = await youtube.Search.GetVideosAsync(arguments);
 
-            var video = searchResults.FirstOrDefault();
+            VideoSearchResult video = searchResults.FirstOrDefault();
 
-            var streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(video.Id);
+            StreamManifest streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(video.Id);
 
-            var audioStreamInfoWithHighestBitrate = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
+            IStreamInfo audioStreamInfoWithHighestBitrate = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
 
-            var filePath = $"{video.Id}.{audioStreamInfoWithHighestBitrate.Container.Name}";
+            string filePath = $"{video.Id}.{audioStreamInfoWithHighestBitrate.Container.Name}";
 
             await youtube.Videos.Streams.DownloadAsync(audioStreamInfoWithHighestBitrate, filePath);
 
-            var response = $"Now playing: {video.Title}\n{video.Url}";
+            string response = $"Now playing: {video.Title}\n{video.Url}";
 
             await ReplyAsync(response);
 
@@ -67,11 +70,11 @@ namespace DiscordBot.Modules
         }
 
         [Command("summon", RunMode = RunMode.Async)]
-        public async Task HandleSummonBotCommand()
+        public async Task HandleSummonCommand()
         {
-            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+            IVoiceChannel voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
 
-            var bvoiceChannel = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceChannel;
+            SocketVoiceChannel bvoiceChannel = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceChannel;
 
             if (voiceChannel == null)
             {
@@ -91,11 +94,11 @@ namespace DiscordBot.Modules
         }
 
         [Command("leave", RunMode = RunMode.Async)]
-        public async Task LeaveCommand()
+        public async Task HandleLeaveCommand()
         {
-            var guild = (Context.Client as DiscordSocketClient).GetGuild(Context.Guild.Id);
+            SocketGuild guild = (Context.Client as DiscordSocketClient).GetGuild(Context.Guild.Id);
 
-            var audioClient = guild?.AudioClient;
+            IAudioClient audioClient = guild?.AudioClient;
 
             if (audioClient?.ConnectionState == ConnectionState.Disconnected)
             {

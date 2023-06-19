@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Threading.Tasks;
+using System.IO;
 using Discord.Audio;
 
 namespace DiscordBot.Modules
@@ -10,7 +11,7 @@ namespace DiscordBot.Modules
 
         public bool IsPlaying { get; internal set; }
 
-        private Process CreateStream(string path)
+        private static Process CreateStream(string path)
         {
             return Process.Start(new ProcessStartInfo
             {
@@ -26,8 +27,8 @@ namespace DiscordBot.Modules
             IsPlaying = true;
 
             using (ffmpeg = CreateStream(path))
-            using (var output = ffmpeg.StandardOutput.BaseStream)
-            using (var discord = audioClient.CreatePCMStream(AudioApplication.Mixed))
+            using (Stream output = ffmpeg.StandardOutput.BaseStream)
+            using (AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music))
             {
                 try { await output.CopyToAsync(discord); }
                 finally { await discord.FlushAsync(); }

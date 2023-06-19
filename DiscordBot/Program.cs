@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
+using System.Reflection;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot
 {
