@@ -38,7 +38,10 @@ namespace DiscordBot
                 .AddSingleton(_client)
                 .AddSingleton(_commands)
                 .AddSingleton<AudioService>()
+                .AddSingleton<PlaylistService>()
                 .BuildServiceProvider();
+
+            DotNetEnv.Env.Load();
 
             string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
 
@@ -58,12 +61,14 @@ namespace DiscordBot
         private Task Client_Ready()
         {
             Console.WriteLine($"Logged in as {_client.CurrentUser}");
+
             return Task.CompletedTask;
         }
 
         private Task Client_Log(LogMessage arg)
         {
             Console.WriteLine(arg);
+
             return Task.CompletedTask;
         }
 
@@ -74,18 +79,38 @@ namespace DiscordBot
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
         }
 
-        private async Task HandleCommandAsync(SocketMessage arg)
+        private Task HandleCommandAsync(SocketMessage arg)
         {
             var message = arg as SocketUserMessage;
-            var context = new SocketCommandContext(_client, message);
 
-            if (message.Author.IsBot) return;
+            if (message == null || message.Author.IsBot) return Task.CompletedTask;
 
             int argPos = 0;
+
             if (message.HasStringPrefix("!", ref argPos))
             {
+                _ = ExecuteCommandAsync(message, argPos);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private async Task ExecuteCommandAsync(SocketUserMessage message, int argPos)
+        {
+            try
+            {
+                var context = new SocketCommandContext(_client, message);
+
                 var result = await _commands.ExecuteAsync(context, argPos, _services);
-                if (!result.IsSuccess) Console.WriteLine(result.ErrorReason);
+
+                if (!result.IsSuccess)
+                {
+                    Console.WriteLine(result.ErrorReason);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Command execution error: {ex}");
             }
         }
     }
