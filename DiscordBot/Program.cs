@@ -1,11 +1,11 @@
-﻿using System;
-using System.Threading.Tasks;
-using System.Reflection;
-using Discord;
+﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
 using DiscordBot.Modules;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Reflection;
+using System.Threading.Tasks;
 
 namespace DiscordBot
 {
@@ -21,6 +21,8 @@ namespace DiscordBot
         {
             var config = new DiscordSocketConfig()
             {
+                EnableVoiceDaveEncryption = true,
+
                 GatewayIntents = GatewayIntents.DirectMessages
                                  | GatewayIntents.GuildMessages
                                  | GatewayIntents.Guilds
@@ -38,7 +40,7 @@ namespace DiscordBot
                 .AddSingleton<AudioService>()
                 .BuildServiceProvider();
 
-            string token = "token bot here";
+            string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
 
             _client.Log += Client_Log;
 
