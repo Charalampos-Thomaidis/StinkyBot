@@ -6,7 +6,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Common;
@@ -138,6 +137,37 @@ namespace DiscordBot.Modules
                 Console.WriteLine($"Add URL song error: {ex}");
 
                 await ReplyAsync("Could not add the song. Please provide a valid YouTube URL.");
+            }
+        }
+
+        [Command("removeurlsong", RunMode = RunMode.Async)]
+        public async Task HandleRemoveUrlSongCommand([Remainder] string url)
+        {
+            try
+            {
+                VideoId videoId = VideoId.Parse(url);
+
+                var playlist = await _playlistService.GetPlaylistAsync(Context.Guild.Id);
+
+                int songIndex = playlist.FindIndex(track => track.VideoId == videoId.ToString());
+
+                if (songIndex == -1)
+                {
+                    await ReplyAsync("This song is not in the music list.");
+                    return;
+                }
+
+                string removedSong = playlist[songIndex].Title;
+
+                await _playlistService.RemoveTrackAsync(Context.Guild.Id, songIndex);
+
+                await ReplyAsync($"Removed from music list: **{removedSong}**");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Remove URL song error: {ex}");
+
+                await ReplyAsync("Could not remove the song. Please provide a valid YouTube URL.");
             }
         }
 
@@ -350,15 +380,16 @@ namespace DiscordBot.Modules
         public async Task HandleExplanationCommands()
         {
             await ReplyAsync(
-                "!summon (ill join your vc)\n" +
-                "!leave (ill leave your vc)\n" +
-                "!song + name of the song (play song)\n" +
-                "!skip (skip song or skip current song from music list)\n" +
-                "!addurlsong + url of the song (add that url song to the music list)\n" +
-                "!addsong (add current song to music list)\n" +
-                "!removesong (remove current song from music list)\n" +
-                "!playmusiclist (play saved music list)\n" +
-                "!stopmusiclist (stop the entire music list)\n" +
+                "!summon (ill join your vc)\n\n" +
+                "!leave (ill leave your vc)\n\n" +
+                "!song + name of the song (play song)\n\n" +
+                "!skip (skip song or skip current song from music list)\n\n" +
+                "!addurlsong + url of the song (add that url song to the music list)\n\n" +
+                "!removeurlsong + url of the song (remove that url song from the music list)\n\n" +
+                "!addsong (add current song to music list)\n\n" +
+                "!removesong (remove current song from music list)\n\n" +
+                "!playmusiclist (play saved music list)\n\n" +
+                "!stopmusiclist (stop the entire music list)\n\n" +
                 "!musiclist (shows the saved music music list)"
             );
         }
