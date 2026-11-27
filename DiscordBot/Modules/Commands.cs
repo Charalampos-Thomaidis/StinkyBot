@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Common;
 using YoutubeExplode.Search;
+using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
 namespace DiscordBot.Modules
@@ -107,6 +108,37 @@ namespace DiscordBot.Modules
             _audioService.StopAudio();
 
             await ReplyAsync("Skipped the current song.");
+        }
+
+
+        [Command("addurlsong", RunMode = RunMode.Async)]
+        public async Task HandleAddUrlSongCommand([Remainder] string url)
+        {
+            try
+            {
+                var youtube = new YoutubeClient();
+
+                VideoId videoId = VideoId.Parse(url);
+
+                var video = await youtube.Videos.GetAsync(videoId);
+
+                var track = new PlaylistTrack
+                {
+                    Title = video.Title,
+                    VideoId = video.Id.ToString(),
+                    Url = video.Url
+                };
+
+                await _playlistService.AddTrackAsync(Context.Guild.Id, track);
+
+                await ReplyAsync($"Added to music list: **{track.Title}**");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Add URL song error: {ex}");
+
+                await ReplyAsync("Could not add the song. Please provide a valid YouTube URL.");
+            }
         }
 
         [Command("addsong", RunMode = RunMode.Async)]
@@ -249,6 +281,7 @@ namespace DiscordBot.Modules
             await ReplyAsync("Stopping the music list...");
         }
 
+
         [Command("musiclist", RunMode = RunMode.Async)]
         public async Task HandleShowMusicListCommand()
         {
@@ -267,8 +300,9 @@ namespace DiscordBot.Modules
                 message += $"\n**{i + 1}.** {playlist[i].Title}\n{playlist[i].Url}\n";
             }
 
-            await ReplyAsync(message);
+            await Context.Channel.SendMessageAsync(message, options: new RequestOptions(), allowedMentions: AllowedMentions.None, messageReference: null, flags: MessageFlags.SuppressEmbeds);
         }
+
 
         [Command("summon", RunMode = RunMode.Async)]
         public async Task HandleSummonCommand()
@@ -320,6 +354,7 @@ namespace DiscordBot.Modules
                 "!leave (ill leave your vc)\n" +
                 "!song + name of the song (play song)\n" +
                 "!skip (skip song or skip current song from music list)\n" +
+                "!addurlsong + url of the song (add that url song to the music list)\n" +
                 "!addsong (add current song to music list)\n" +
                 "!removesong (remove current song from music list)\n" +
                 "!playmusiclist (play saved music list)\n" +
