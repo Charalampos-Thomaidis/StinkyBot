@@ -3,8 +3,10 @@ using Discord.Audio;
 using Discord.Commands;
 using Discord.WebSocket;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using YoutubeExplode;
@@ -277,7 +279,10 @@ namespace DiscordBot.Modules
                     }
                 }
 
-                await ReplyAsync("Music list finished!");
+                if (!StopPlaylistRequests.ContainsKey(guildId))
+                {
+                    await ReplyAsync("Music list finished!");
+                }
             }
             catch (Exception ex)
             {
@@ -411,7 +416,7 @@ namespace DiscordBot.Modules
                 return;
             }
 
-            string filePath = System.IO.Path.Combine(AppContext.BaseDirectory, "test-audio.mp4");
+            string filePath = System.IO.Path.Combine(AppContext.BaseDirectory, "mp4", "test-audio.mp4");
 
             if (!System.IO.File.Exists(filePath))
             {
@@ -422,6 +427,69 @@ namespace DiscordBot.Modules
             await ReplyAsync("Playing local test audio...");
 
             await _audioService.SendAudio(Context.Client.GetGuild(Context.Guild.Id).AudioClient, filePath);
+        }
+
+        [Command("testtone", RunMode = RunMode.Async)]
+        public async Task HandleTestToneCommand()
+        {
+            SocketVoiceState? botVoiceState = (Context.Guild as SocketGuild)?.CurrentUser?.VoiceState;
+
+            if (botVoiceState?.VoiceChannel == null)
+            {
+                await ReplyAsync("I am not currently in a voice channel.");
+                return;
+            }
+
+            if (_audioService.IsPlaying)
+            {
+                await ReplyAsync("Audio is already playing. Stop it before running this test.");
+                return;
+            }
+
+            await ReplyAsync("Sending a 440 Hz test tone for 10 seconds...");
+
+            IAudioClient audioClient = Context.Client.GetGuild(Context.Guild.Id).AudioClient;
+
+            const int sampleRate = 48000;
+            const int samplesPerFrame = 960; // 20 ms
+            const int frameCount = 500;      // 10 seconds
+            const double frequency = 440.0;
+            const double amplitude = 5000.0;
+
+            byte[] frame = new byte[samplesPerFrame * 2 * 2];
+
+            using AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music);
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            for (int frameIndex = 0; frameIndex < frameCount; frameIndex++)
+            {
+                for (int i = 0; i < samplesPerFrame; i++)
+                {
+                    long sampleIndex = (long)frameIndex * samplesPerFrame + i;
+
+                    short sample = (short)(Math.Sin(2.0 * Math.PI * frequency * sampleIndex / sampleRate) * amplitude);
+
+                    int offset = i * 4;
+
+                    BinaryPrimitives.WriteInt16LittleEndian(frame.AsSpan(offset, 2), sample);
+                    BinaryPrimitives.WriteInt16LittleEndian(frame.AsSpan(offset + 2, 2), sample);
+                }
+
+                await discord.WriteAsync(frame, 0, frame.Length);
+
+                long targetMilliseconds = (frameIndex + 1) * 20L;
+                int remainingMilliseconds = (int)(targetMilliseconds - stopwatch.ElapsedMilliseconds);
+
+                if (remainingMilliseconds > 0)
+                {
+                    await Task.Delay(remainingMilliseconds);
+                }
+            }
+
+            await discord.FlushAsync();
+
+            await ReplyAsync("Test tone finished.");
         }
     }
 }

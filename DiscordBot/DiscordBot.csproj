@@ -26,73 +26,36 @@
 		<PackageReference Include="DotNetEnv" Version="3.2.0" />
 		<PackageReference Include="libdave" Version="1.2.1.9" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
+		<PackageReference Include="OpusSharp.Natives" Version="1.6.1.4" />
+		<PackageReference Include="Sodium.Core" Version="1.4.1" />
+		<PackageReference Include="System.Net.Http" Version="4.3.4" />
+		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
+		<PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
 		<PackageReference Include="YoutubeExplode" Version="6.6.3" />
 	</ItemGroup>
 
-	<!-- Windows-only native libraries and FFmpeg -->
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+	<!-- Copy libdave, Opus and libsodium to the root of the output -->
+	<Target Name="CopyLibDaveToOutput" AfterTargets="Build">
 
-		<None Update="nativeLibs\libsodium.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<!-- Windows libdave -->
+		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\libdave.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'win-x64' and Exists('$(TargetDir)runtimes\win-x64\native\libdave.dll')" />
 
-		<None Update="nativeLibs\opus.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<!-- Linux libdave -->
+		<Copy SourceFiles="$(TargetDir)runtimes\linux-x64\native\libdave.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64' and Exists('$(TargetDir)runtimes\linux-x64\native\libdave.so')" />
 
-		<None Update="nativeLibs\PATH_Programms\ffmpeg.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 
-		<None Update="nativeLibs\PATH_Programms\ffplay.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<!-- Windows Opus -->
+		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\opus.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="('$(RuntimeIdentifier)' == '' or '$(RuntimeIdentifier)' == 'win-x64') and Exists('$(TargetDir)runtimes\win-x64\native\opus.dll')" />
 
-		<None Update="nativeLibs\PATH_Programms\ffprobe.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<!-- Windows libsodium -->
+		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\libsodium.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="('$(RuntimeIdentifier)' == '' or '$(RuntimeIdentifier)' == 'win-x64') and Exists('$(TargetDir)runtimes\win-x64\native\libsodium.dll')" />
 
-	</ItemGroup>
 
-	<!-- Linux native libraries -->
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+		<!-- Linux Opus -->
+		<Copy SourceFiles="$(NuGetPackageRoot)opussharp.natives\1.6.1.4\runtimes\linux-x64\native\opus.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
 
-		<None Update="nativeLibs/Linux/libopus.so">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<TargetPath>libopus.so</TargetPath>
-		</None>
-
-		<None Update="nativeLibs/Linux/libopus.so.0">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<TargetPath>libopus.so.0</TargetPath>
-		</None>
-
-		<None Update="nativeLibs/Linux/libopus.so.0.8.0">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<TargetPath>libopus.so.0.8.0</TargetPath>
-		</None>
-
-		<None Update="nativeLibs/Linux/libsodium.so.23">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<TargetPath>libsodium.so.23</TargetPath>
-		</None>
-
-		<None Update="nativeLibs/Linux/libsodium.so.23.3.0">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<TargetPath>libsodium.so.23.3.0</TargetPath>
-		</None>
-
-	</ItemGroup>
-
-	<!-- Copy libdave.dll to the root of the Windows output -->
-	<Target Name="CopyLibDaveToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == 'win-x64'">
-
-		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\libdave.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(TargetDir)runtimes\win-x64\native\libdave.dll')" />
+		<!-- Linux libsodium -->
+		<Copy SourceFiles="$(NuGetPackageRoot)libsodium\1.0.22\runtimes\linux-x64\native\libsodium.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
 
 	</Target>
 

@@ -1,8 +1,10 @@
-﻿using Discord.Audio;
+﻿
+using Discord.Audio;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DiscordBot.Modules
@@ -10,8 +12,9 @@ namespace DiscordBot.Modules
     public class AudioService
     {
         private Process ffmpeg;
+        private CancellationTokenSource playbackCancellation;
 
-        public bool IsPlaying { get; internal set; }
+        public bool IsPlaying { get; private set; }
 
         private static Process CreateStream(string path)
         {
@@ -30,6 +33,9 @@ namespace DiscordBot.Modules
 
         public async Task SendAudio(IAudioClient audioClient, string path)
         {
+            var cancellation = new CancellationTokenSource();
+
+            playbackCancellation = cancellation;
             IsPlaying = true;
 
             try
@@ -40,26 +46,43 @@ namespace DiscordBot.Modules
                 {
                     try
                     {
-                        await output.CopyToAsync(discord);
+                        await output.CopyToAsync(discord, 81920, cancellation.Token);
                     }
                     finally
                     {
-                        await discord.FlushAsync();
+                        if (cancellation.IsCancellationRequested && !ffmpeg.HasExited)
+                        {
+                            ffmpeg.Kill();
+                        }
+
+                        if (!cancellation.IsCancellationRequested)
+                        {
+                            await discord.FlushAsync();
+                        }
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Playback was cancelled.
             }
             finally
             {
                 IsPlaying = false;
                 ffmpeg = null;
+                playbackCancellation = null;
+                cancellation.Dispose();
             }
         }
 
         public void StopAudio()
         {
-            if (ffmpeg == null || ffmpeg.HasExited) return;
+            playbackCancellation?.Cancel();
 
-            ffmpeg.Kill();
+            if (ffmpeg != null && !ffmpeg.HasExited)
+            {
+                ffmpeg.Kill();
+            }
         }
     }
 }
