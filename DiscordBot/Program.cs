@@ -55,6 +55,8 @@ namespace DiscordBot
 
             await _client.StartAsync();
 
+            await _client.SetGameAsync("!commands for help");
+
             await Task.Delay(-1);
         }
 
@@ -75,6 +77,7 @@ namespace DiscordBot
         public async Task InstallCommandsAsync()
         {
             _client.MessageReceived += HandleCommandAsync;
+            _client.MessageReceived += HandleWordDetectionAsync;
 
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
         }
@@ -111,6 +114,18 @@ namespace DiscordBot
             catch (Exception ex)
             {
                 Console.WriteLine($"Command execution error: {ex}");
+            }
+        }
+
+        private async Task HandleWordDetectionAsync(SocketMessage arg)
+        {
+            if (arg.Author.IsBot || arg.Author.IsWebhook) return;
+
+            string message = arg.Content.ToLowerInvariant();
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(stinky|stinking|stink)\b"))
+            {
+                await arg.Channel.SendMessageAsync("\U0001F4A9");
             }
         }
     }

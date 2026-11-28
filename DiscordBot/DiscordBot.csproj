@@ -33,30 +33,28 @@
 		<PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
 		<PackageReference Include="YoutubeExplode" Version="6.6.3" />
 	</ItemGroup>
-
+	
 	<!-- Copy libdave, Opus and libsodium to the root of the output -->
 	<Target Name="CopyLibDaveToOutput" AfterTargets="Build">
 
 		<!-- Windows libdave -->
 		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\libdave.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'win-x64' and Exists('$(TargetDir)runtimes\win-x64\native\libdave.dll')" />
-
-		<!-- Linux libdave -->
-		<Copy SourceFiles="$(TargetDir)runtimes\linux-x64\native\libdave.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64' and Exists('$(TargetDir)runtimes\linux-x64\native\libdave.so')" />
-
-
+		
 		<!-- Windows Opus -->
 		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\opus.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="('$(RuntimeIdentifier)' == '' or '$(RuntimeIdentifier)' == 'win-x64') and Exists('$(TargetDir)runtimes\win-x64\native\opus.dll')" />
-
+		
 		<!-- Windows libsodium -->
 		<Copy SourceFiles="$(TargetDir)runtimes\win-x64\native\libsodium.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="('$(RuntimeIdentifier)' == '' or '$(RuntimeIdentifier)' == 'win-x64') and Exists('$(TargetDir)runtimes\win-x64\native\libsodium.dll')" />
-
-
+		
+		<!-- Linux libdave -->
+		<Copy SourceFiles="$(TargetDir)runtimes\linux-x64\native\libdave.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64' and Exists('$(TargetDir)runtimes\linux-x64\native\libdave.so')" />
+		
 		<!-- Linux Opus -->
 		<Copy SourceFiles="$(NuGetPackageRoot)opussharp.natives\1.6.1.4\runtimes\linux-x64\native\opus.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
-
+		
 		<!-- Linux libsodium -->
 		<Copy SourceFiles="$(NuGetPackageRoot)libsodium\1.0.22\runtimes\linux-x64\native\libsodium.so" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
-
+		
 	</Target>
 
 </Project>

@@ -1,10 +1,8 @@
-﻿
-using Discord.Audio;
+﻿using Discord.Audio;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace DiscordBot.Modules
@@ -12,7 +10,6 @@ namespace DiscordBot.Modules
     public class AudioService
     {
         private Process ffmpeg;
-        private CancellationTokenSource playbackCancellation;
 
         public bool IsPlaying { get; private set; }
 
@@ -25,7 +22,7 @@ namespace DiscordBot.Modules
             return Process.Start(new ProcessStartInfo
             {
                 FileName = ffmpegPath,
-                Arguments = $"-i \"{path}\" -f s16le -ar 48000 -ac 2 pipe:1",
+                Arguments = $"-threads 1 -i \"{path}\" -f s16le pipe:1",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
             });
@@ -33,56 +30,24 @@ namespace DiscordBot.Modules
 
         public async Task SendAudio(IAudioClient audioClient, string path)
         {
-            var cancellation = new CancellationTokenSource();
-
-            playbackCancellation = cancellation;
             IsPlaying = true;
 
-            try
+            using (ffmpeg = CreateStream(path))
+            using (Stream output = ffmpeg.StandardOutput.BaseStream)
+            using (AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music, bitrate: 64000, bufferMillis: 1000, packetLoss: 0))
             {
-                using (ffmpeg = CreateStream(path))
-                using (Stream output = ffmpeg.StandardOutput.BaseStream)
-                using (AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music))
-                {
-                    try
-                    {
-                        await output.CopyToAsync(discord, 81920, cancellation.Token);
-                    }
-                    finally
-                    {
-                        if (cancellation.IsCancellationRequested && !ffmpeg.HasExited)
-                        {
-                            ffmpeg.Kill();
-                        }
+                try { await output.CopyToAsync(discord); }
+                finally { await discord.FlushAsync(); }
+            }
 
-                        if (!cancellation.IsCancellationRequested)
-                        {
-                            await discord.FlushAsync();
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Playback was cancelled.
-            }
-            finally
-            {
-                IsPlaying = false;
-                ffmpeg = null;
-                playbackCancellation = null;
-                cancellation.Dispose();
-            }
+            IsPlaying = false;
         }
 
         public void StopAudio()
         {
-            playbackCancellation?.Cancel();
-
-            if (ffmpeg != null && !ffmpeg.HasExited)
-            {
-                ffmpeg.Kill();
-            }
+            IsPlaying = false;
+            ffmpeg.Kill();
+            ffmpeg.Dispose();
         }
     }
 }

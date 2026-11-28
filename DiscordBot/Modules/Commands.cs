@@ -25,12 +25,32 @@ namespace DiscordBot.Modules
         private static readonly ConcurrentDictionary<ulong, PlaylistTrack> CurrentTracks = new ConcurrentDictionary<ulong, PlaylistTrack>();
         private static readonly ConcurrentDictionary<ulong, bool> ActivePlaylists = new ConcurrentDictionary<ulong, bool>();
         private static readonly ConcurrentDictionary<ulong, bool> StopPlaylistRequests = new ConcurrentDictionary<ulong, bool>();
+        private static readonly ConcurrentDictionary<ulong, bool> RandomPlaylists = new ConcurrentDictionary<ulong, bool>();
+        private static readonly ConcurrentDictionary<ulong, bool> LoopPlaylists = new ConcurrentDictionary<ulong, bool>();
 
         public Commands(AudioService audioService, PlaylistService playlistService)
         {
             _audioService = audioService;
             _playlistService = playlistService;
 
+        }
+
+        private async Task UpdateBotStatusAsync()
+        {
+            ulong guildId = Context.Guild.Id;
+
+            bool loopEnabled = LoopPlaylists.ContainsKey(guildId);
+            bool randomEnabled = RandomPlaylists.ContainsKey(guildId);
+
+            string status = "!commands for help";
+
+            if (loopEnabled)
+                status += " | \U0001F501: ON";
+
+            if (randomEnabled)
+                status += " | \U0001F3B2: ON";
+
+            await Context.Client.SetGameAsync(status);
         }
 
         private async Task<string> DownloadPlaylistTrackAsync(PlaylistTrack track)
@@ -100,6 +120,8 @@ namespace DiscordBot.Modules
         [Command("skip", RunMode = RunMode.Async)]
         public async Task HandleSkipCommand()
         {
+            ulong guildId = Context.Guild.Id;
+
             if (!_audioService.IsPlaying)
             {
                 await ReplyAsync("There is no song currently playing.");
@@ -108,11 +130,18 @@ namespace DiscordBot.Modules
 
             _audioService.StopAudio();
 
-            await ReplyAsync("Skipped the current song.");
+            if (ActivePlaylists.ContainsKey(guildId))
+            {
+                await ReplyAsync("Skipped the current song in the music list.");
+            }
+            else
+            {
+                await ReplyAsync("Skipped the current song.");
+            }
         }
 
 
-        [Command("addurlsong", RunMode = RunMode.Async)]
+        [Command("addurl", RunMode = RunMode.Async)]
         public async Task HandleAddUrlSongCommand([Remainder] string url)
         {
             try
@@ -142,7 +171,7 @@ namespace DiscordBot.Modules
             }
         }
 
-        [Command("removeurlsong", RunMode = RunMode.Async)]
+        [Command("removeurl", RunMode = RunMode.Async)]
         public async Task HandleRemoveUrlSongCommand([Remainder] string url)
         {
             try
@@ -173,7 +202,7 @@ namespace DiscordBot.Modules
             }
         }
 
-        [Command("addsong", RunMode = RunMode.Async)]
+        [Command("add", RunMode = RunMode.Async)]
         public async Task HandleAddToPlaylistCommand()
         {
             ulong guildId = Context.Guild.Id;
@@ -189,7 +218,7 @@ namespace DiscordBot.Modules
             await ReplyAsync($"Added to music list: **{track.Title}**");
         }
 
-        [Command("removesong", RunMode = RunMode.Async)]
+        [Command("remove", RunMode = RunMode.Async)]
         public async Task HandleRemoveFromListCommand(int songNumber)
         {
             var playlist = await _playlistService.GetPlaylistAsync(Context.Guild.Id);
@@ -213,7 +242,7 @@ namespace DiscordBot.Modules
             await ReplyAsync($"Removed **{removedSong}** from the music list.");
         }
 
-        [Command("playmusiclist", RunMode = RunMode.Async)]
+        [Command("play", RunMode = RunMode.Async)]
         public async Task HandlePlayMusicPlaylistCommand()
         {
             ulong guildId = Context.Guild.Id;
@@ -234,7 +263,7 @@ namespace DiscordBot.Modules
 
             if (!ActivePlaylists.TryAdd(guildId, true))
             {
-                await ReplyAsync("The playlist is already playing.");
+                await ReplyAsync("The music list is already playing.");
                 return;
             }
 
@@ -242,6 +271,8 @@ namespace DiscordBot.Modules
             {
                 List<PlaylistTrack> playlist = await _playlistService.GetPlaylistAsync(guildId);
                 StopPlaylistRequests.TryRemove(guildId, out _);
+                RandomPlaylists.TryRemove(guildId, out _);
+                LoopPlaylists.TryRemove(guildId, out _);
 
                 if (playlist.Count == 0)
                 {
@@ -251,21 +282,59 @@ namespace DiscordBot.Modules
 
                 var youtube = new YoutubeClient();
 
+                var random = new Random();
+
+                HashSet<int> remainingIndices = new HashSet<int>(Enumerable.Range(0, playlist.Count));
+
+                bool stoppedByRequest = false;
+
                 await ReplyAsync($"Starting music list with {playlist.Count} songs.");
 
-                for (int i = 0; i < playlist.Count; i++)
+                while (true)
                 {
                     if (StopPlaylistRequests.TryRemove(guildId, out _))
                     {
+                        stoppedByRequest = true;
                         await ReplyAsync("Music list stopped.");
                         break;
                     }
 
-                    PlaylistTrack track = playlist[i];
+                    if (remainingIndices.Count == 0)
+                    {
+                        if (!LoopPlaylists.ContainsKey(guildId))
+                        {
+                            break;
+                        }
 
-                    await ReplyAsync($"Now playing ({i + 1}/{playlist.Count}): **{track.Title}**\n{track.Url}");
+                        remainingIndices = new HashSet<int>(Enumerable.Range(0, playlist.Count));
+                    }
+
+                    int songIndex;
+
+                    if (RandomPlaylists.ContainsKey(guildId))
+                    {
+                        int randomIndex = random.Next(remainingIndices.Count);
+                        songIndex = remainingIndices.ElementAt(randomIndex);
+                    }
+                    else
+                    {
+                        songIndex = remainingIndices.Min();
+                    }
+
+                    remainingIndices.Remove(songIndex);
+
+                    PlaylistTrack track = playlist[songIndex];
+
+                    await ReplyAsync($"Now playing ({playlist.Count - remainingIndices.Count}/{playlist.Count}): **{track.Title}**\n{track.Url}");
 
                     string filePath = await DownloadPlaylistTrackAsync(track);
+
+                    if (StopPlaylistRequests.TryRemove(guildId, out _))
+                    {
+                        stoppedByRequest = true;
+                        await ReplyAsync("Music list stopped.");
+                        break;
+                    }
 
                     CurrentTracks[guildId] = track;
 
@@ -279,7 +348,7 @@ namespace DiscordBot.Modules
                     }
                 }
 
-                if (!StopPlaylistRequests.ContainsKey(guildId))
+                if (!stoppedByRequest)
                 {
                     await ReplyAsync("Music list finished!");
                 }
@@ -292,10 +361,16 @@ namespace DiscordBot.Modules
             finally
             {
                 ActivePlaylists.TryRemove(guildId, out _);
+                RandomPlaylists.TryRemove(guildId, out _);
+                LoopPlaylists.TryRemove(guildId, out _);
+                StopPlaylistRequests.TryRemove(guildId, out _);
+                CurrentTracks.TryRemove(guildId, out _);
+
+                await Context.Client.SetGameAsync("!commands for help");
             }
         }
 
-        [Command("stopmusiclist", RunMode = RunMode.Async)]
+        [Command("stop", RunMode = RunMode.Async)]
         public async Task HandleStopMusicListCommand()
         {
             ulong guildId = Context.Guild.Id;
@@ -316,8 +391,91 @@ namespace DiscordBot.Modules
             await ReplyAsync("Stopping the music list...");
         }
 
+        [Command("random", RunMode = RunMode.Async)]
+        public async Task HandleRandomCommand()
+        {
+            ulong guildId = Context.Guild.Id;
 
-        [Command("musiclist", RunMode = RunMode.Async)]
+            if (!ActivePlaylists.ContainsKey(guildId))
+            {
+                await ReplyAsync("There is no music list currently playing.");
+                return;
+            }
+
+            if (!RandomPlaylists.TryAdd(guildId, true))
+            {
+                await ReplyAsync("Random playback is already enabled.");
+                return;
+            }
+
+            await ReplyAsync("Random playback enabled.");
+            await UpdateBotStatusAsync();
+        }
+
+        [Command("randomoff", RunMode = RunMode.Async)]
+        public async Task HandleRandomOffCommand()
+        {
+            ulong guildId = Context.Guild.Id;
+
+            if (!ActivePlaylists.ContainsKey(guildId))
+            {
+                await ReplyAsync("There is no music list currently playing.");
+                return;
+            }
+
+            if (!RandomPlaylists.TryRemove(guildId, out _))
+            {
+                await ReplyAsync("Random playback is already disabled.");
+                return;
+            }
+
+            await ReplyAsync("Random playback disabled.");
+            await UpdateBotStatusAsync();
+        }
+
+        [Command("loop", RunMode = RunMode.Async)]
+        public async Task HandleLoopCommand()
+        {
+            ulong guildId = Context.Guild.Id;
+
+            if (!ActivePlaylists.ContainsKey(guildId))
+            {
+                await ReplyAsync("There is no music list currently playing.");
+                return;
+            }
+
+            if (!LoopPlaylists.TryAdd(guildId, true))
+            {
+                await ReplyAsync("Music list looping is already enabled.");
+                return;
+            }
+
+            await ReplyAsync("Music list looping enabled.");
+            await UpdateBotStatusAsync();
+        }
+
+        [Command("loopoff", RunMode = RunMode.Async)]
+        public async Task HandleLoopOffCommand()
+        {
+            ulong guildId = Context.Guild.Id;
+
+            if (!ActivePlaylists.ContainsKey(guildId))
+            {
+                await ReplyAsync("There is no music list currently playing.");
+                return;
+            }
+
+            if (!LoopPlaylists.TryRemove(guildId, out _))
+            {
+                await ReplyAsync("Music list looping is already disabled.");
+                return;
+            }
+
+            await ReplyAsync("Music list looping disabled.");
+            await UpdateBotStatusAsync();
+        }
+
+        [Command("list", RunMode = RunMode.Async)]
         public async Task HandleShowMusicListCommand()
         {
             var playlist = await _playlistService.GetPlaylistAsync(Context.Guild.Id);
@@ -385,17 +543,21 @@ namespace DiscordBot.Modules
         public async Task HandleExplanationCommands()
         {
             await ReplyAsync(
-                "!summon (ill join your vc)\n\n" +
-                "!leave (ill leave your vc)\n\n" +
-                "!song + name of the song (play song)\n\n" +
-                "!skip (skip song or skip current song from music list)\n\n" +
-                "!addurlsong + url of the song (add that url song to the music list)\n\n" +
-                "!removeurlsong + url of the song (remove that url song from the music list)\n\n" +
-                "!addsong (add current song to music list)\n\n" +
-                "!removesong (remove current song from music list)\n\n" +
-                "!playmusiclist (play saved music list)\n\n" +
-                "!stopmusiclist (stop the entire music list)\n\n" +
-                "!musiclist (shows the saved music music list)"
+                "\U0001F3A4     !summon -> join your vc\n\n" +
+                "\U0001F44B     !leave -> leave your vc\n\n" +
+                "\U0001F3B5     !song + name of the song -> search and play the song from Youtube\n\n" +
+                "\u23ED\uFE0F     !skip -> skip song or skip current song from music list\n\n" +
+                "\U0001F3B6     !list -> shows all songs in music list\n\n" +
+                "\u25B6\uFE0F     !play -> play saved music list\n\n" +
+                "\u23F9\uFE0F     !stop -> stop the entire music list\n\n" +
+                "\U0001F501     !loop -> enable music list looping\n\n" +
+                "\U0001F501     !loopoff -> disable music list looping\n\n" +
+                "\U0001F3B2     !random -> enable random song playback\n\n" +
+                "\U0001F3B2     !randomoff -> disable random song playback\n\n" +
+                "\u2795     !add -> add current song to music list\n\n" +
+                "\u2796     !remove -> remove current song from music list\n\n" +
+                "\u2795     !addurl + url of the song -> add that url song to the music list\n\n" +
+                "\u2796     !removeurl + url of the song -> remove that url song from the music list"
             );
         }
 
@@ -451,8 +613,8 @@ namespace DiscordBot.Modules
             IAudioClient audioClient = Context.Client.GetGuild(Context.Guild.Id).AudioClient;
 
             const int sampleRate = 48000;
-            const int samplesPerFrame = 960; // 20 ms
-            const int frameCount = 500;      // 10 seconds
+            const int samplesPerFrame = 960;
+            const int frameCount = 500;
             const double frequency = 440.0;
             const double amplitude = 5000.0;
 
