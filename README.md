@@ -8,13 +8,17 @@ Current Commands:
 !leave                               leaves the voice channel
 !song + name of the song             searches the closest match from Youtube and plays the song
 !skip                                skips the current song playing, also moves to the next song of the music list if used when bot plays music from music list
-!addurlsong + Youtube URL            add song music list
-!addsong                             add song music list
-!removeurlsong + Youtube URL         remove song from music list
-!removesong                          remove song from music list
-!playmusiclist                       play music list
-!stopmusiclist                       stop music list, used to skip all songs from that list
-!musiclist                           show current songs in the music list
+!addurl + Youtube URL                add song music list
+!add                                 add song music list
+!removeurl + Youtube URL             remove song from music list
+!remove                              remove song from music list
+!play                                play music list
+!stop                                stop music list, used to skip all songs from that list
+!list                                show current songs in the music list
+!random                              random playback enable for music list
+!randomoff                           random playback disable for music list
+!loop                                enable loop for music list
+!loopoff                             disable loop for music list
 !commands                            show all commands the bot has
 !testtone                            plays a test tone (for testing purposes)
 !testaudio                           plays a mp4 (for testing purposes)
